@@ -272,6 +272,10 @@ package com.adobe.protocols.oauth2
 					
 					// stop event from propogating
 					locationChangeEvent.preventDefault();
+                    authorizationCodeGrant.stageWebView.removeEventListener(LocationChangeEvent.LOCATION_CHANGING, onLocationChanging);
+                    authorizationCodeGrant.stageWebView.removeEventListener(LocationChangeEvent.LOCATION_CHANGE, onLocationChanging);
+                    authorizationCodeGrant.stageWebView.removeEventListener(Event.COMPLETE, onStageWebViewComplete);
+                    authorizationCodeGrant.stageWebView.removeEventListener(ErrorEvent.ERROR, onStageWebViewError);
 					
 					// determine if authorization was successful
 					var queryParams:Object = extractQueryParams(locationChangeEvent.location);
@@ -415,7 +419,10 @@ package com.adobe.protocols.oauth2
 					
 					// stop event from propogating
 					locationChangeEvent.preventDefault();
-					
+                    implicitGrant.stageWebView.removeEventListener(LocationChangeEvent.LOCATION_CHANGING, onLocationChange);
+                    implicitGrant.stageWebView.removeEventListener(LocationChangeEvent.LOCATION_CHANGE, onLocationChange);
+                    implicitGrant.stageWebView.removeEventListener(ErrorEvent.ERROR, onStageWebViewError);
+
 					// determine if authorization was successful
 					var queryParams:Object = extractQueryParams(locationChangeEvent.location);
 					var accessToken:String = queryParams.access_token;
