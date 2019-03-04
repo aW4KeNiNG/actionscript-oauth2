@@ -7,8 +7,9 @@ package com.adobe.protocols.oauth2
 	import com.adobe.protocols.oauth2.grant.ImplicitGrant;
 	import com.adobe.protocols.oauth2.grant.ResourceOwnerCredentialsGrant;
 	import com.adobe.serialization.json.JSONParseError;
-	
-	import flash.events.ErrorEvent;
+    import com.tuarua.webview.WebViewEvent;
+
+    import flash.events.ErrorEvent;
 	import flash.events.Event;
 	import flash.events.EventDispatcher;
 	import flash.events.IOErrorEvent;
@@ -255,29 +256,43 @@ package com.adobe.protocols.oauth2
 			var getAccessTokenEvent:GetAccessTokenEvent = new GetAccessTokenEvent();
 			
 			// add event listeners
-			authorizationCodeGrant.stageWebView.addEventListener(LocationChangeEvent.LOCATION_CHANGING, onLocationChanging);
-			authorizationCodeGrant.stageWebView.addEventListener(LocationChangeEvent.LOCATION_CHANGE, onLocationChanging);
-			authorizationCodeGrant.stageWebView.addEventListener(Event.COMPLETE, onStageWebViewComplete);
-			authorizationCodeGrant.stageWebView.addEventListener(ErrorEvent.ERROR, onStageWebViewError);
+            authorizationCodeGrant.stageWebView.addEventListener(WebViewEvent.ON_PROPERTY_CHANGE, onPropertyChange);
+            authorizationCodeGrant.stageWebView.addEventListener(WebViewEvent.ON_FAIL, onStageWebViewError);
 			
 			// start the auth process
 			var startTime:Number = new Date().time;
 			log.info("Loading auth URL: " + authorizationCodeGrant.getFullAuthUrl(authEndpoint));
-			authorizationCodeGrant.stageWebView.loadURL(authorizationCodeGrant.getFullAuthUrl(authEndpoint));
+			authorizationCodeGrant.stageWebView.load(authorizationCodeGrant.getFullAuthUrl(authEndpoint));
+
+            function onPropertyChange(event:WebViewEvent):void
+            {
+                switch(event.params.propertyName)
+                {
+                    case "url":
+                        onLocationChanging(event);
+                        break;
+                    case "isLoading":
+                        if(!event.params.value)
+                            onStageWebViewComplete(event);
+                        break;
+                }
+            }
 			
-			function onLocationChanging(locationChangeEvent:LocationChangeEvent):void
-			{
-				log.info("Loading URL: " + locationChangeEvent.location);
+			function onLocationChanging(event:WebViewEvent):void
+            {
+                var location:String = event.params.value;
+				log.info("Loading URL: " + location);
                 authCodeReady = true;
-				if (locationChangeEvent.location.indexOf(authorizationCodeGrant.redirectUri) == 0 && locationChangeEvent.location.indexOf(OAuth2Const.RESPONSE_PROPERTY_AUTHORIZATION_CODE) > 0)
+				if (location.indexOf(authorizationCodeGrant.redirectUri) == 0 && location.indexOf(OAuth2Const.RESPONSE_PROPERTY_AUTHORIZATION_CODE) > 0)
 				{
+                    removeListeners();
 					log.info("Redirect URI encountered (" + authorizationCodeGrant.redirectUri + ").  Extracting values from path.");
 					
 					// stop event from propogating
-					locationChangeEvent.preventDefault();
+                    event.preventDefault();
 					
 					// determine if authorization was successful
-					var queryParams:Object = extractQueryParams(locationChangeEvent.location);
+					var queryParams:Object = extractQueryParams(location);
 					var code:String = queryParams.code;		// authorization code
 					if (code != null)
 					{
@@ -370,6 +385,7 @@ package com.adobe.protocols.oauth2
 				//       for more information.
 				if (authorizationCodeGrant.redirectUri == OAuth2Const.GOOGLE_INSTALLED_APPLICATION_REDIRECT_URI && event.currentTarget.title.indexOf(OAuth2Const.RESPONSE_TYPE_AUTHORIZATION_CODE) > 0)
 				{
+                    removeListeners();
 					var codeString:String = event.currentTarget.title.substring(event.currentTarget.title.indexOf(OAuth2Const.RESPONSE_TYPE_AUTHORIZATION_CODE));
 					var code:String = codeString.split("=")[1];
 					log.debug("Authorization code extracted from page title: " + code);
@@ -381,16 +397,23 @@ package com.adobe.protocols.oauth2
 				}
 			}  // onStageWebViewComplete
 			
-			function onStageWebViewError(errorEvent:ErrorEvent):void
+			function onStageWebViewError(event:WebViewEvent):void
 			{
                 if(authCodeReady)
                     return;
 
-				log.error("Error occurred with StageWebView: " + errorEvent);
+                removeListeners();
+				log.error("Error occurred with StageWebView: " + event.params.errorCode + " " + event.params.errorText);
 				getAccessTokenEvent.errorCode = "STAGE_WEB_VIEW_ERROR";
 				getAccessTokenEvent.errorMessage = "Error occurred with StageWebView";
 				dispatchEvent(getAccessTokenEvent);
 			}  // onStageWebViewError
+
+            function removeListeners():void
+            {
+                authorizationCodeGrant.stageWebView.removeEventListener(WebViewEvent.ON_PROPERTY_CHANGE, onPropertyChange);
+                authorizationCodeGrant.stageWebView.removeEventListener(WebViewEvent.ON_FAIL, onStageWebViewError);
+            }
 		}  // getAccessTokenWithAuthorizationCodeGrant
 		
 		/**
@@ -406,27 +429,39 @@ package com.adobe.protocols.oauth2
 			var getAccessTokenEvent:GetAccessTokenEvent = new GetAccessTokenEvent();
 			
 			// add event listeners
-			implicitGrant.stageWebView.addEventListener(LocationChangeEvent.LOCATION_CHANGING, onLocationChange);
-			implicitGrant.stageWebView.addEventListener(LocationChangeEvent.LOCATION_CHANGE, onLocationChange);
-			implicitGrant.stageWebView.addEventListener(ErrorEvent.ERROR, onStageWebViewError);
-			
+			implicitGrant.stageWebView.addEventListener(WebViewEvent.ON_PROPERTY_CHANGE, onPropertyChange);
+			implicitGrant.stageWebView.addEventListener(WebViewEvent.ON_FAIL, onStageWebViewError);
+
 			// start the auth process
 			log.info("Loading auth URL: " + implicitGrant.getFullAuthUrl(authEndpoint));
-			implicitGrant.stageWebView.loadURL(implicitGrant.getFullAuthUrl(authEndpoint));
-			
-			function onLocationChange(locationChangeEvent:LocationChangeEvent):void
+			implicitGrant.stageWebView.load(implicitGrant.getFullAuthUrl(authEndpoint));
+
+            function onPropertyChange(event:WebViewEvent):void
+            {
+                switch(event.params.propertyName)
+                {
+                    case "url":
+                        onLocationChange(event);
+                        break;
+                }
+            }
+
+			function onLocationChange(event:WebViewEvent):void
 			{
-				log.info("Loading URL: " + locationChangeEvent.location);
+                var location:String = event.params.value;
+                log.info("Loading URL: " + location);
                 authCodeReady = true;
-				if (locationChangeEvent.location.indexOf(implicitGrant.redirectUri) == 0 && locationChangeEvent.location.indexOf(OAuth2Const.RESPONSE_PROPERTY_ACCESS_TOKEN) > 0)
+				if (location.indexOf(implicitGrant.redirectUri) == 0 && location.indexOf(OAuth2Const.RESPONSE_PROPERTY_ACCESS_TOKEN) > 0)
 				{
+                    removeListeners();
+
 					log.info("Redirect URI encountered (" + implicitGrant.redirectUri + ").  Extracting values from path.");
 					
 					// stop event from propogating
-					locationChangeEvent.preventDefault();
+					event.preventDefault();
 
 					// determine if authorization was successful
-					var queryParams:Object = extractQueryParams(locationChangeEvent.location);
+					var queryParams:Object = extractQueryParams(location);
 					var accessToken:String = queryParams.access_token;
 					if (accessToken != null)
 					{
@@ -444,16 +479,23 @@ package com.adobe.protocols.oauth2
 				}  // if statement
 			}  // onLocationChange
 			
-			function onStageWebViewError(errorEvent:ErrorEvent):void
+			function onStageWebViewError(event:WebViewEvent):void
 			{
                 if(authCodeReady)
                     return;
 
-				log.error("Error occurred with StageWebView: " + errorEvent);
+                removeListeners();
+                log.error("Error occurred with StageWebView: " + event.params.errorCode + " " + event.params.errorText);
 				getAccessTokenEvent.errorCode = "STAGE_WEB_VIEW_ERROR";
 				getAccessTokenEvent.errorMessage = "Error occurred with StageWebView";
 				dispatchEvent(getAccessTokenEvent);
 			}  // onStageWebViewError
+
+            function removeListeners():void
+            {
+                implicitGrant.stageWebView.removeEventListener(WebViewEvent.ON_PROPERTY_CHANGE, onPropertyChange);
+                implicitGrant.stageWebView.removeEventListener(WebViewEvent.ON_FAIL, onStageWebViewError);
+            }
 		}  // getAccessTokenWithImplicitGrant
 		
 		/**

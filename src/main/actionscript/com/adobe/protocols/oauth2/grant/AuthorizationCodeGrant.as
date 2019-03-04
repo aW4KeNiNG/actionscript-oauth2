@@ -1,8 +1,7 @@
 package com.adobe.protocols.oauth2.grant
 {
 	import com.adobe.protocols.oauth2.OAuth2Const;
-	
-	import flash.media.StageWebView;
+    import com.tuarua.WebViewANE;
 
 	/**
 	 * Class to encapsulate all of the relevant properties used during
@@ -12,7 +11,7 @@ package com.adobe.protocols.oauth2.grant
 	 */
 	public class AuthorizationCodeGrant implements IGrantType
 	{
-		private var _stageWebView:StageWebView;
+		private var _stageWebView:WebViewANE;
 		private var _clientId:String;
 		private var _clientSecret:String;
 		private var _redirectUri:String;
@@ -31,7 +30,7 @@ package com.adobe.protocols.oauth2.grant
 		 * @param state (Optional) An opaque value used by the client to maintain state between the request and callback
 		 * @param queryParams (Optional) Additional query parameters that can be passed to the authorization URL
 		 */
-		public function AuthorizationCodeGrant(stageWebView:StageWebView, clientId:String, clientSecret:String, redirectUri:String, scope:String = null, state:Object = null, queryParams:Object = null)
+		public function AuthorizationCodeGrant(stageWebView:WebViewANE, clientId:String, clientSecret:String, redirectUri:String, scope:String = null, state:Object = null, queryParams:Object = null)
 		{
 			_stageWebView = stageWebView;
 			_clientId = clientId;
@@ -45,7 +44,7 @@ package com.adobe.protocols.oauth2.grant
 		/**
 		 * The <code>StageWebView</code> object for which to display the user-consent page.
 		 */
-		public function get stageWebView():StageWebView
+		public function get stageWebView():WebViewANE
 		{
 			return _stageWebView;
 		}  // stageWebView
