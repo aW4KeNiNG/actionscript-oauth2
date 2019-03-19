@@ -262,7 +262,7 @@ package com.adobe.protocols.oauth2
 			// start the auth process
 			var startTime:Number = new Date().time;
 			log.info("Loading auth URL: " + authorizationCodeGrant.getFullAuthUrl(authEndpoint));
-			authorizationCodeGrant.stageWebView.load(authorizationCodeGrant.getFullAuthUrl(authEndpoint));
+			authorizationCodeGrant.stageWebView.load(new URLRequest(authorizationCodeGrant.getFullAuthUrl(authEndpoint)));
 
             function onPropertyChange(event:WebViewEvent):void
             {
@@ -434,7 +434,7 @@ package com.adobe.protocols.oauth2
 
 			// start the auth process
 			log.info("Loading auth URL: " + implicitGrant.getFullAuthUrl(authEndpoint));
-			implicitGrant.stageWebView.load(implicitGrant.getFullAuthUrl(authEndpoint));
+			implicitGrant.stageWebView.load(new URLRequest(implicitGrant.getFullAuthUrl(authEndpoint)));
 
             function onPropertyChange(event:WebViewEvent):void
             {
