@@ -25,7 +25,8 @@ package com.adobe.protocols.oauth2
 	import org.as3commons.logging.api.getLogger;
 	import org.as3commons.logging.setup.LevelTargetSetup;
 	import org.as3commons.logging.setup.LogSetupLevel;
-	import org.as3commons.logging.setup.target.TraceTarget;
+    import org.as3commons.logging.setup.target.IFormattingLogTarget;
+    import org.as3commons.logging.setup.target.TraceTarget;
 
 	/**
 	 * Event that is broadcast when results from a <code>getAccessToken</code> request are received.
@@ -62,7 +63,7 @@ package com.adobe.protocols.oauth2
 		private var grantType:IGrantType;
 		private var authEndpoint:String;
 		private var tokenEndpoint:String;
-		private var traceTarget:TraceTarget = new TraceTarget();
+		private var logTarget:IFormattingLogTarget;
 		
 		
 		/**
@@ -72,16 +73,16 @@ package com.adobe.protocols.oauth2
 		 * @param tokenEndpoint The token endpoint used by the OAuth 2.0 server
 		 * @param logLevel (Optional) The new log level for the logger to use
 		 */
-		public function OAuth2(authEndpoint:String, tokenEndpoint:String, logLevel:LogSetupLevel = null)
+		public function OAuth2(authEndpoint:String, tokenEndpoint:String, logLevel:LogSetupLevel = null, logTarget:IFormattingLogTarget = null)
 		{
 			// save endpoint properties
 			this.authEndpoint = authEndpoint;
 			this.tokenEndpoint = tokenEndpoint;
 			
 			// set up logging
-			traceTarget = new TraceTarget();
-			traceTarget.format = "{date} {time} [{logLevel}] {name} {message}";
-			LOGGER_FACTORY.setup = new LevelTargetSetup(traceTarget, (logLevel == null) ? LogSetupLevel.NONE : logLevel);
+			this.logTarget = logTarget ? logTarget : new TraceTarget();
+			logTarget.format = "{date} {time} [{logLevel}] {name} {message}";
+			LOGGER_FACTORY.setup = new LevelTargetSetup(logTarget, (logLevel == null) ? LogSetupLevel.NONE : logLevel);
 		} // OAuth2
 		
 		/**
@@ -240,7 +241,7 @@ package com.adobe.protocols.oauth2
 		 */
 		public function setLogLevel(logLevel:LogSetupLevel):void
 		{
-			LOGGER_FACTORY.setup = new LevelTargetSetup(traceTarget, logLevel);
+			LOGGER_FACTORY.setup = new LevelTargetSetup(logTarget, logLevel);
 		}  // setLogLevel
 		
 		/**
