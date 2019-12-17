@@ -589,6 +589,7 @@ package com.adobe.protocols.oauth2
 		 */
 		private function extractQueryParams(url:String):Object
 		{
+            url = decodeURIComponent(url);
 			var delimiter:String = (url.indexOf("?") > 0) ? "?" : "#";
 			var queryParamsString:String = url.split(delimiter)[1];
 			var queryParamsArray:Array = queryParamsString.split("&");
