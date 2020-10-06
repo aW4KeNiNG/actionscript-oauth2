@@ -1,7 +1,7 @@
 package com.adobe.protocols.oauth2.grant
 {
 	import com.adobe.protocols.oauth2.OAuth2Const;
-    import com.tuarua.WebViewANE;
+    import com.tuarua.WebView;
 
 	/**
 	 * Class to encapsulate all of the relevant properties used during
@@ -11,7 +11,7 @@ package com.adobe.protocols.oauth2.grant
 	 */
 	public class ImplicitGrant implements IGrantType
 	{
-		private var _stageWebView:WebViewANE;
+		private var _stageWebView:WebView;
 		private var _clientId:String;
 		private var _redirectUri:String;
 		private var _scope:String;
@@ -28,7 +28,7 @@ package com.adobe.protocols.oauth2.grant
 		 * @param state (Optional) An opaque value used by the client to maintain state between the request and callback
 		 * @param queryParams (Optional) Additional query parameters that can be passed to the authorization URL
 		 */
-		public function ImplicitGrant(stageWebView:WebViewANE, clientId:String, redirectUri:String, scope:String = null, state:Object = null, queryParams:Object = null)
+		public function ImplicitGrant(stageWebView:WebView, clientId:String, redirectUri:String, scope:String = null, state:Object = null, queryParams:Object = null)
 		{
 			_stageWebView = stageWebView;
 			_clientId = clientId;
@@ -41,7 +41,7 @@ package com.adobe.protocols.oauth2.grant
 		/**
 		 * The <code>StageWebView</code> object for which to display the user-consent page.
 		 */
-		public function get stageWebView():WebViewANE
+		public function get stageWebView():WebView
 		{
 			return _stageWebView;
 		}  // stageWebView
