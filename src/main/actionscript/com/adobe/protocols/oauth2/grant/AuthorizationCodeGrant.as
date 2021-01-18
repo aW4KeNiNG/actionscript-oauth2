@@ -1,9 +1,8 @@
 package com.adobe.protocols.oauth2.grant
 {
-	import com.adobe.protocols.oauth2.OAuth2Const;
-    import com.tuarua.WebView;
+    import com.adobe.protocols.oauth2.OAuth2Const;
 
-	/**
+    /**
 	 * Class to encapsulate all of the relevant properties used during
 	 * a get-access-token request using the authorization code grant type.
 	 * 
@@ -11,7 +10,6 @@ package com.adobe.protocols.oauth2.grant
 	 */
 	public class AuthorizationCodeGrant implements IGrantType
 	{
-		private var _stageWebView:WebView;
 		private var _clientId:String;
 		private var _clientSecret:String;
 		private var _redirectUri:String;
@@ -22,7 +20,6 @@ package com.adobe.protocols.oauth2.grant
 		/**
 		 * Constructor.
 		 * 
-		 * @param stageWebView The <code>StageWebView</code> object for which to display the user-consent page
 		 * @param clientId The client identifier
 		 * @param clientSecret The client secret
 		 * @param redirectUri The redirect URI to return to after the authorization process has completed
@@ -30,9 +27,8 @@ package com.adobe.protocols.oauth2.grant
 		 * @param state (Optional) An opaque value used by the client to maintain state between the request and callback
 		 * @param queryParams (Optional) Additional query parameters that can be passed to the authorization URL
 		 */
-		public function AuthorizationCodeGrant(stageWebView:WebView, clientId:String, clientSecret:String, redirectUri:String, scope:String = null, state:Object = null, queryParams:Object = null)
+		public function AuthorizationCodeGrant(clientId:String, clientSecret:String, redirectUri:String, scope:String = null, state:Object = null, queryParams:Object = null)
 		{
-			_stageWebView = stageWebView;
 			_clientId = clientId;
 			_clientSecret = clientSecret;
 			_redirectUri = redirectUri;
@@ -40,15 +36,7 @@ package com.adobe.protocols.oauth2.grant
 			_state = state;
 			_queryParams = queryParams;
 		}  // AuthorizationCodeGrant
-		
-		/**
-		 * The <code>StageWebView</code> object for which to display the user-consent page.
-		 */
-		public function get stageWebView():WebView
-		{
-			return _stageWebView;
-		}  // stageWebView
-		
+
 		/**
 		 * The client identifier as described in the OAuth spec v2.15,
 		 * section 3, Client Authentication.

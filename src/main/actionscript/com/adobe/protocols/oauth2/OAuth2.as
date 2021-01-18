@@ -1,34 +1,34 @@
 package com.adobe.protocols.oauth2
 {
-	import com.adobe.protocols.oauth2.event.GetAccessTokenEvent;
-	import com.adobe.protocols.oauth2.event.RefreshAccessTokenEvent;
-	import com.adobe.protocols.oauth2.grant.AuthorizationCodeGrant;
-	import com.adobe.protocols.oauth2.grant.IGrantType;
-	import com.adobe.protocols.oauth2.grant.ImplicitGrant;
-	import com.adobe.protocols.oauth2.grant.ResourceOwnerCredentialsGrant;
-	import com.adobe.serialization.json.JSONParseError;
-    import com.tuarua.webview.WebViewEvent;
+    import com.adobe.protocols.oauth2.event.GetAccessTokenEvent;
+    import com.adobe.protocols.oauth2.event.RefreshAccessTokenEvent;
+    import com.adobe.protocols.oauth2.grant.AuthorizationCodeGrant;
+    import com.adobe.protocols.oauth2.grant.IGrantType;
+    import com.adobe.protocols.oauth2.grant.ImplicitGrant;
+    import com.adobe.protocols.oauth2.grant.ResourceOwnerCredentialsGrant;
+    import com.adobe.serialization.json.JSONParseError;
 
     import flash.events.ErrorEvent;
-	import flash.events.Event;
-	import flash.events.EventDispatcher;
-	import flash.events.IOErrorEvent;
-	import flash.events.LocationChangeEvent;
-	import flash.events.SecurityErrorEvent;
-	import flash.net.URLLoader;
-	import flash.net.URLRequest;
-	import flash.net.URLRequestMethod;
-	import flash.net.URLVariables;
-	
-	import org.as3commons.logging.api.ILogger;
-	import org.as3commons.logging.api.LOGGER_FACTORY;
-	import org.as3commons.logging.api.getLogger;
-	import org.as3commons.logging.setup.LevelTargetSetup;
-	import org.as3commons.logging.setup.LogSetupLevel;
+    import flash.events.Event;
+    import flash.events.EventDispatcher;
+    import flash.events.IOErrorEvent;
+    import flash.events.SecurityErrorEvent;
+    import flash.net.Socket;
+    import flash.net.URLLoader;
+    import flash.net.URLRequest;
+    import flash.net.URLRequestMethod;
+    import flash.net.URLVariables;
+    import flash.net.navigateToURL;
+
+    import org.as3commons.logging.api.ILogger;
+    import org.as3commons.logging.api.LOGGER_FACTORY;
+    import org.as3commons.logging.api.getLogger;
+    import org.as3commons.logging.setup.LevelTargetSetup;
+    import org.as3commons.logging.setup.LogSetupLevel;
     import org.as3commons.logging.setup.target.IFormattingLogTarget;
     import org.as3commons.logging.setup.target.TraceTarget;
 
-	/**
+    /**
 	 * Event that is broadcast when results from a <code>getAccessToken</code> request are received.
 	 * 
 	 * @eventType com.adobe.protocols.oauth2.event.GetAccessTokenEvent.TYPE
@@ -64,6 +64,7 @@ package com.adobe.protocols.oauth2
 		private var authEndpoint:String;
 		private var tokenEndpoint:String;
 		private var logTarget:IFormattingLogTarget;
+        private var localServer:LocalServer;
 		
 		
 		/**
@@ -84,7 +85,16 @@ package com.adobe.protocols.oauth2
 			logTarget.format = "{date} {time} [{logLevel}] {name} {message}";
 			LOGGER_FACTORY.setup = new LevelTargetSetup(logTarget, (logLevel == null) ? LogSetupLevel.NONE : logLevel);
 		} // OAuth2
-		
+
+        public function dispose():void
+        {
+            if(localServer)
+            {
+                localServer.close();
+                localServer = null;
+            }
+        }
+
 		/**
 		 * Initiates the access token request workflow with the proper context as
 		 * described by the passed-in grant-type object.  Upon completion, will
@@ -243,7 +253,7 @@ package com.adobe.protocols.oauth2
 		{
 			LOGGER_FACTORY.setup = new LevelTargetSetup(logTarget, logLevel);
 		}  // setLogLevel
-		
+
 		/**
 		 * @private
 		 * 
@@ -255,42 +265,55 @@ package com.adobe.protocols.oauth2
 
 			// create result event
 			var getAccessTokenEvent:GetAccessTokenEvent = new GetAccessTokenEvent();
-			
-			// add event listeners
-            authorizationCodeGrant.stageWebView.addEventListener(WebViewEvent.ON_PROPERTY_CHANGE, onPropertyChange);
-            authorizationCodeGrant.stageWebView.addEventListener(WebViewEvent.ON_FAIL, onStageWebViewError);
+
+            if(authorizationCodeGrant.redirectUri.indexOf("localhost"))
+            {
+                localServer = new LocalServer();
+                localServer.listen(parseInt(authorizationCodeGrant.redirectUri.split(":").pop()));
+                localServer.addEventListener(ErrorEvent.ERROR, onError);
+                localServer.addEventListener(LocalServer.EVENT_DATA_RECEIVED, function(e:SocketEvent):void {
+                    var socket:Socket = e.socket;
+                    var bufferString:String = e.data.toString();
+                    var headerCheck:Number = bufferString.search(/\r?\n\r?\n/);
+                    if (headerCheck != -1)
+                    {
+                        localServer.removeEventListener(LocalServer.EVENT_DATA_RECEIVED, arguments.callee);
+
+                        var headerString:String = bufferString.substring(0, headerCheck);
+                        // Parse the request signature.
+                        var initialRequestSignature:String = headerString.substring(0, headerString.search(/\r?\n/));
+                        var initialRequestSignatureComponents:Array = initialRequestSignature.split(" ");
+//                        var method:String = initialRequestSignatureComponents[0];
+                        var serverAndPath:String = initialRequestSignatureComponents[1];
+                        serverAndPath = serverAndPath.replace(/^http(s)?:\/\//, "");
+                        var path:String = serverAndPath.substring(serverAndPath.indexOf("/"), serverAndPath.length);
+                        checkLocation(path);
+
+                        localServer.send(socket, "HTTP/1.0 200 OK\n\n");
+                    }
+                });
+            }
 			
 			// start the auth process
 			var startTime:Number = new Date().time;
 			log.info("Loading auth URL: " + authorizationCodeGrant.getFullAuthUrl(authEndpoint));
-			authorizationCodeGrant.stageWebView.load(new URLRequest(authorizationCodeGrant.getFullAuthUrl(authEndpoint)));
+			navigateToURL(new URLRequest(authorizationCodeGrant.getFullAuthUrl(authEndpoint)));
 
-            function onPropertyChange(event:WebViewEvent):void
+            function onError(e:ErrorEvent):void
             {
-                switch(event.params.propertyName)
-                {
-                    case "url":
-                        onLocationChanging(event);
-                        break;
-                    case "isLoading":
-                        if(!event.params.value)
-                            onStageWebViewComplete(event);
-                        break;
-                }
+                log.error(e.errorID + ": " + e.text);
+                getAccessTokenEvent.errorCode = String(e.errorID);
+                getAccessTokenEvent.errorMessage = e.text;
+                dispatchEvent(getAccessTokenEvent);
             }
 			
-			function onLocationChanging(event:WebViewEvent):void
+			function checkLocation(location:String):void
             {
-                var location:String = event.params.value;
 				log.info("Loading URL: " + location);
                 authCodeReady = true;
-				if (location.indexOf(authorizationCodeGrant.redirectUri) == 0 && location.indexOf(OAuth2Const.RESPONSE_PROPERTY_AUTHORIZATION_CODE) > 0)
+				if (location.indexOf(OAuth2Const.RESPONSE_PROPERTY_AUTHORIZATION_CODE) > 0)
 				{
-                    removeListeners();
 					log.info("Redirect URI encountered (" + authorizationCodeGrant.redirectUri + ").  Extracting values from path.");
-					
-					// stop event from propogating
-                    event.preventDefault();
 					
 					// determine if authorization was successful
 					var queryParams:Object = extractQueryParams(location);
@@ -377,44 +400,7 @@ package com.adobe.protocols.oauth2
 					dispatchEvent(getAccessTokenEvent);
 				}  // onGetAccessTokenError
 			}  // getAccessTokenWithAuthCode
-			
-			function onStageWebViewComplete(event:Event):void
-			{
-				// Note: Special provision made particularly for Google OAuth 2 implementation for installed
-				//       applications.  Particularly, when we see a certain redirect URI, we must look for the authorization
-				//       code in the page title as opposed to in the URL.  See https://developers.google.com/accounts/docs/OAuth2InstalledApp#choosingredirecturi
-				//       for more information.
-				if (authorizationCodeGrant.redirectUri == OAuth2Const.GOOGLE_INSTALLED_APPLICATION_REDIRECT_URI && event.currentTarget.title.indexOf(OAuth2Const.RESPONSE_TYPE_AUTHORIZATION_CODE) > 0)
-				{
-                    removeListeners();
-					var codeString:String = event.currentTarget.title.substring(event.currentTarget.title.indexOf(OAuth2Const.RESPONSE_TYPE_AUTHORIZATION_CODE));
-					var code:String = codeString.split("=")[1];
-					log.debug("Authorization code extracted from page title: " + code);
-					getAccessTokenWithAuthCode(code);
-				}
-				else
-				{
-					log.info("Auth URL loading complete after " + (new Date().time - startTime) + "ms");
-				}
-			}  // onStageWebViewComplete
-			
-			function onStageWebViewError(event:WebViewEvent):void
-			{
-                if(authCodeReady)
-                    return;
 
-                removeListeners();
-				log.error("Error occurred with StageWebView: " + event.params.errorCode + " " + event.params.errorText);
-				getAccessTokenEvent.errorCode = "STAGE_WEB_VIEW_ERROR";
-				getAccessTokenEvent.errorMessage = "Error occurred with StageWebView";
-				dispatchEvent(getAccessTokenEvent);
-			}  // onStageWebViewError
-
-            function removeListeners():void
-            {
-                authorizationCodeGrant.stageWebView.removeEventListener(WebViewEvent.ON_PROPERTY_CHANGE, onPropertyChange);
-                authorizationCodeGrant.stageWebView.removeEventListener(WebViewEvent.ON_FAIL, onStageWebViewError);
-            }
 		}  // getAccessTokenWithAuthorizationCodeGrant
 		
 		/**
@@ -428,38 +414,54 @@ package com.adobe.protocols.oauth2
 
             // create result event
 			var getAccessTokenEvent:GetAccessTokenEvent = new GetAccessTokenEvent();
-			
-			// add event listeners
-			implicitGrant.stageWebView.addEventListener(WebViewEvent.ON_PROPERTY_CHANGE, onPropertyChange);
-			implicitGrant.stageWebView.addEventListener(WebViewEvent.ON_FAIL, onStageWebViewError);
+
+            if(implicitGrant.redirectUri.indexOf("localhost"))
+            {
+                localServer = new LocalServer();
+                localServer.listen(parseInt(implicitGrant.redirectUri.split(":").pop()));
+                localServer.addEventListener(ErrorEvent.ERROR, onError);
+                localServer.addEventListener(LocalServer.EVENT_DATA_RECEIVED, function(e:SocketEvent):void {
+                    var socket:Socket = e.socket;
+                    var bufferString:String = e.data.toString();
+                    var headerCheck:Number = bufferString.search(/\r?\n\r?\n/);
+                    if (headerCheck != -1)
+                    {
+                        localServer.removeEventListener(LocalServer.EVENT_DATA_RECEIVED, arguments.callee);
+
+                        var headerString:String = bufferString.substring(0, headerCheck);
+                        // Parse the request signature.
+                        var initialRequestSignature:String = headerString.substring(0, headerString.search(/\r?\n/));
+                        var initialRequestSignatureComponents:Array = initialRequestSignature.split(" ");
+//                        var method:String = initialRequestSignatureComponents[0];
+                        var serverAndPath:String = initialRequestSignatureComponents[1];
+                        serverAndPath = serverAndPath.replace(/^http(s)?:\/\//, "");
+                        var path:String = serverAndPath.substring(serverAndPath.indexOf("/"), serverAndPath.length);
+                        checkLocation(path);
+
+                        localServer.send(socket, "HTTP/1.0 200 OK\n\n");
+                    }
+                });
+            }
 
 			// start the auth process
 			log.info("Loading auth URL: " + implicitGrant.getFullAuthUrl(authEndpoint));
-			implicitGrant.stageWebView.load(new URLRequest(implicitGrant.getFullAuthUrl(authEndpoint)));
+            navigateToURL(new URLRequest(implicitGrant.getFullAuthUrl(authEndpoint)));
 
-            function onPropertyChange(event:WebViewEvent):void
+            function onError(e:ErrorEvent):void
             {
-                switch(event.params.propertyName)
-                {
-                    case "url":
-                        onLocationChange(event);
-                        break;
-                }
+                log.error(e.errorID + ": " + e.text);
+                getAccessTokenEvent.errorCode = String(e.errorID);
+                getAccessTokenEvent.errorMessage = e.text;
+                dispatchEvent(getAccessTokenEvent);
             }
 
-			function onLocationChange(event:WebViewEvent):void
+            function checkLocation(location:String):void
 			{
-                var location:String = event.params.value;
                 log.info("Loading URL: " + location);
                 authCodeReady = true;
 				if (location.indexOf(implicitGrant.redirectUri) == 0 && location.indexOf(OAuth2Const.RESPONSE_PROPERTY_ACCESS_TOKEN) > 0)
 				{
-                    removeListeners();
-
 					log.info("Redirect URI encountered (" + implicitGrant.redirectUri + ").  Extracting values from path.");
-					
-					// stop event from propogating
-					event.preventDefault();
 
 					// determine if authorization was successful
 					var queryParams:Object = extractQueryParams(location);
@@ -479,24 +481,6 @@ package com.adobe.protocols.oauth2
 					}  // else statement
 				}  // if statement
 			}  // onLocationChange
-			
-			function onStageWebViewError(event:WebViewEvent):void
-			{
-                if(authCodeReady)
-                    return;
-
-                removeListeners();
-                log.error("Error occurred with StageWebView: " + event.params.errorCode + " " + event.params.errorText);
-				getAccessTokenEvent.errorCode = "STAGE_WEB_VIEW_ERROR";
-				getAccessTokenEvent.errorMessage = "Error occurred with StageWebView";
-				dispatchEvent(getAccessTokenEvent);
-			}  // onStageWebViewError
-
-            function removeListeners():void
-            {
-                implicitGrant.stageWebView.removeEventListener(WebViewEvent.ON_PROPERTY_CHANGE, onPropertyChange);
-                implicitGrant.stageWebView.removeEventListener(WebViewEvent.ON_FAIL, onStageWebViewError);
-            }
 		}  // getAccessTokenWithImplicitGrant
 		
 		/**
@@ -603,5 +587,115 @@ package com.adobe.protocols.oauth2
 			
 			return queryParams;
 		}  // extractQueryParams
+
+
+
 	}  // class declaration
-}  // package
+}
+
+import flash.events.ErrorEvent;
+import flash.events.Event;
+import flash.events.EventDispatcher;
+import flash.events.OutputProgressEvent;
+import flash.events.ProgressEvent;
+import flash.events.ServerSocketConnectEvent;
+import flash.net.ServerSocket;
+import flash.net.Socket;
+import flash.utils.ByteArray;
+
+internal class LocalServer extends EventDispatcher
+{
+    static public const EVENT_DATA_RECEIVED:String = "dataReceived";
+
+    private var _serverSocket:ServerSocket;
+
+    public function listen(port:int):void
+    {
+        if(_serverSocket)
+            return;
+
+        _serverSocket = new ServerSocket();
+        _serverSocket.addEventListener(ServerSocketConnectEvent.CONNECT, onConnect);
+
+        try
+        {
+            _serverSocket.bind(port, "0.0.0.0");
+            _serverSocket.listen();
+        }
+        catch (e:Error)
+        {
+            dispatchEvent(new ErrorEvent(ErrorEvent.ERROR, false, false, e.name + ": " + e.message, e.errorID));
+        }
+    }
+
+    public function close():void
+    {
+        if(_serverSocket)
+        {
+            _serverSocket.close();
+            _serverSocket = null;
+        }
+    }
+
+    public function send(socket:Socket, data:String):void
+    {
+        try
+        {
+            if(socket.connected)
+            {
+                socket.addEventListener(OutputProgressEvent.OUTPUT_PROGRESS, onOutputProgress);
+                socket.writeUTFBytes(data);
+                socket.flush();
+            }
+        }
+        catch(e:Error)
+        {
+            dispatchEvent(new ErrorEvent(ErrorEvent.ERROR, false, false, e.name + ": " + e.message, e.errorID));
+        }
+
+        function onOutputProgress(e:OutputProgressEvent):void
+        {
+            if(e.bytesPending == 0)
+            {
+                socket.removeEventListener(OutputProgressEvent.OUTPUT_PROGRESS, onOutputProgress);
+                socket.close();
+            }
+        }
+    }
+
+    private function onConnect(event:ServerSocketConnectEvent):void
+    {
+        var clientSocket:Socket = event.socket;
+        clientSocket.addEventListener(ProgressEvent.SOCKET_DATA, onClientSocketData);
+        clientSocket.addEventListener(Event.CLOSE, onClose);
+        var buffer:ByteArray = new ByteArray();
+
+        function onClientSocketData(e:ProgressEvent):void
+        {
+            clientSocket.readBytes(buffer, buffer.length, clientSocket.bytesAvailable);
+            dispatchEvent(new SocketEvent(EVENT_DATA_RECEIVED, clientSocket, buffer));
+        }
+
+        function onClose(e:Event):void
+        {
+            if(clientSocket.connected)
+            {
+                clientSocket.flush();
+                clientSocket.close();
+            }
+        }
+    }
+}
+
+internal class SocketEvent extends Event
+{
+    public var socket:Socket;
+    public var data:ByteArray;
+
+    public function SocketEvent(type:String, socket:Socket, data:ByteArray)
+    {
+        super(type);
+        this.socket = socket;
+        this.data = data;
+    }
+}

@@ -1,9 +1,8 @@
 package com.adobe.protocols.oauth2.grant
 {
-	import com.adobe.protocols.oauth2.OAuth2Const;
-    import com.tuarua.WebView;
+    import com.adobe.protocols.oauth2.OAuth2Const;
 
-	/**
+    /**
 	 * Class to encapsulate all of the relevant properties used during
 	 * a get-access-token request using the implicit grant type.
 	 * 
@@ -11,7 +10,6 @@ package com.adobe.protocols.oauth2.grant
 	 */
 	public class ImplicitGrant implements IGrantType
 	{
-		private var _stageWebView:WebView;
 		private var _clientId:String;
 		private var _redirectUri:String;
 		private var _scope:String;
@@ -21,31 +19,21 @@ package com.adobe.protocols.oauth2.grant
 		/**
 		 * Constructor.
 		 * 
-		 * @param stageWebView The <code>StageWebView</code> object for which to display the user-consent page
 		 * @param clientId The client identifier
 		 * @param redirectUri The redirect URI to return to after the authorization process has completed
 		 * @param scope (Optional) The scope of the access request expressed as a list of space-delimited, case-sensitive strings
 		 * @param state (Optional) An opaque value used by the client to maintain state between the request and callback
 		 * @param queryParams (Optional) Additional query parameters that can be passed to the authorization URL
 		 */
-		public function ImplicitGrant(stageWebView:WebView, clientId:String, redirectUri:String, scope:String = null, state:Object = null, queryParams:Object = null)
+		public function ImplicitGrant(clientId:String, redirectUri:String, scope:String = null, state:Object = null, queryParams:Object = null)
 		{
-			_stageWebView = stageWebView;
 			_clientId = clientId;
 			_redirectUri = redirectUri;
 			_scope = scope;
 			_state = state;
 			_queryParams = queryParams;
 		}  // ImplicitGrant
-		
-		/**
-		 * The <code>StageWebView</code> object for which to display the user-consent page.
-		 */
-		public function get stageWebView():WebView
-		{
-			return _stageWebView;
-		}  // stageWebView
-		
+
 		/**
 		 * The client identifier as described in the OAuth spec v2.15,
 		 * section 3, Client Authentication.
