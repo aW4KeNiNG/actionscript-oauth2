@@ -268,6 +268,9 @@ package com.adobe.protocols.oauth2
 
             if(authorizationCodeGrant.redirectUri.indexOf("localhost"))
             {
+                if(localServer)
+                    localServer.close();
+
                 localServer = new LocalServer();
                 localServer.listen(parseInt(authorizationCodeGrant.redirectUri.split(":").pop()));
                 localServer.addEventListener(ErrorEvent.ERROR, onError);
@@ -417,6 +420,9 @@ package com.adobe.protocols.oauth2
 
             if(implicitGrant.redirectUri.indexOf("localhost"))
             {
+                if(localServer)
+                    localServer.close();
+
                 localServer = new LocalServer();
                 localServer.listen(parseInt(implicitGrant.redirectUri.split(":").pop()));
                 localServer.addEventListener(ErrorEvent.ERROR, onError);
